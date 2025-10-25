@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* =======================================
+   Scanadillo Professional Theme
+   ======================================= */
+:root {
+  --color-bg: #f9fafc;
+  --color-accent-1: #d9e8ff;
+  --color-accent-2: #d8ffe7;
+  --color-accent-3: #e8e1ff;
+  --color-text: #1f1f29;
+  --color-muted: #6b7280;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0e0b20;
+    --color-text: #ededed;
+    --color-muted: #a5a5b5;
+  }
+}
+
+/* Base */
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Animations */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.6s ease-out both; }
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.ring-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid rgba(110, 143, 255, 0.4);
+  animation: pulse-ring 2.5s ease-out infinite;
+}
+
+/* Glass */
+.glass {
+  backdrop-filter: blur(16px) saturate(160%);
+  background-color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 24px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+.dark .glass {
+  background-color: rgba(18, 25, 45, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
