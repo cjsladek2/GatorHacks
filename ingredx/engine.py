@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 import json
 
-from .core.models import Explanation, IngredientAnalysis, DetailLevel
+from .core.models import Explanation, IngredientAnalysis
 from .core.prompts import DISCLAIMER
 from .adapters.openai_translator import OpenAITranslator
 from .adapters.openai_summarizer import OpenAISummarizer
@@ -12,7 +12,7 @@ from .adapters.openai_summarizer import OpenAISummarizer
 
 class IngredientEngine:
     """
-    AI-only ingredient engine with persistent safety rating consistency.
+    AI-only ingredient engine with strict, persistent safety rating consistency.
     """
 
     def __init__(self, cache_file: str = "ingredx_cache.json"):
@@ -24,6 +24,7 @@ class IngredientEngine:
 
     # ---------- Persistent cache helpers ----------
     def _load_cache(self) -> Dict[str, Dict[str, float]]:
+        """Load the safety rating cache from disk."""
         if os.path.exists(self.cache_file):
             try:
                 with open(self.cache_file, "r", encoding="utf-8") as f:
@@ -33,6 +34,7 @@ class IngredientEngine:
         return {}
 
     def _save_cache(self) -> None:
+        """Save the safety rating cache to disk."""
         try:
             with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(self._memory, f, indent=2)
@@ -45,13 +47,44 @@ class IngredientEngine:
         Generate either a short blurb, a detailed overview, or a structured JSON schema
         describing the ingredient.
         """
-        # FIXED: pass the language into the prompt builder
-        prompt = self._build_generation_prompt(ingredient_name, mode=mode, language=output_language)
+        name_key = ingredient_name.lower().strip()
 
-        # Only force JSON output for schema mode
+        # ✅ always reload cache before generation (ensures same value across runs)
+        self._memory = self._load_cache()
+
+        # ✅ load known rating if available
+        known_rating = None
+        if name_key in self._memory:
+            known_rating = self._memory[name_key].get("health_safety_rating")
+
+        # ✅ pass rating hint into prompt
+        prompt = self._build_generation_prompt(
+            ingredient_name,
+            mode=mode,
+            language=output_language,
+            known_rating=known_rating,
+        )
+
+        # ✅ force JSON only for schema mode
         force_json = (mode == "schema")
-
         text_output = self.summarizer.summarize(prompt, force_json=force_json)
+
+        # ✅ if schema, extract and persist health_safety_rating
+        if mode == "schema":
+            try:
+                parsed = json.loads(text_output)
+                rating = float(parsed.get("health_safety_rating"))
+                if 0 <= rating <= 1:
+                    # cache both rating and all schema data
+                    self._memory[name_key] = parsed
+                    self._save_cache()
+                    known_rating = rating
+            except Exception:
+                pass
+
+        # ✅ for overview/blurb, inject the rating value directly if known
+        if known_rating is not None and mode == "overview":
+            text_output = f"{text_output.strip()}\n\n[Health Rating: {known_rating:.2f}]"
 
         explanation = Explanation(
             detail_level=mode,
@@ -65,7 +98,7 @@ class IngredientEngine:
             match=None,
             data=None,
             explanation=explanation,
-            disclaimer="This information is educational, not medical advice.",
+            disclaimer=DISCLAIMER,
         )
 
     # ---------- Prompt builder ----------
@@ -79,16 +112,16 @@ class IngredientEngine:
         """Construct the correct LLM prompt for each mode."""
         rating_hint = (
             f"The ingredient '{ingredient_name}' already has an established health safety rating of "
-            f"{known_rating:.2f} on a scale of 0–1. Use this exact value for consistency.\n\n"
+            f"{known_rating:.2f} on a scale of 0–1. You must use this exact value consistently.\n\n"
             if known_rating is not None else ""
         )
 
         if mode == "blurb":
             return (
-                f"{rating_hint}"
                 f"You are a chemistry explainer. Write a MAX 2-sentence, layperson-friendly summary "
-                f"of '{ingredient_name}', focusing on the highlights of what it is, what it does, "
-                f"and general safety notes. Avoid jargon.\n\nWrite in {language}."
+                f"of '{ingredient_name}', focusing only on what it is, what it does, and any general safety "
+                f"considerations. Do NOT mention or reference any numeric ratings, decimals, or scores. "
+                f"Avoid jargon and keep it friendly.\n\nWrite in {language}."
             )
 
         elif mode == "overview":
@@ -106,8 +139,6 @@ class IngredientEngine:
                 f"Use the same rating if known.\nWrite clearly in {language}."
             )
 
-
-
         elif mode == "schema":
             return (
                 f"{rating_hint}"
@@ -123,13 +154,14 @@ class IngredientEngine:
                 '  "edible": "true or false"\n'
                 "}\n\n"
                 "If a health safety rating is already established, use the same number.\n"
-                "Return ONLY valid JSON with no additional commentary, explanation, or markdown formatting."
+                "Return ONLY valid JSON with no commentary, explanation, or markdown."
             )
 
         else:
             raise ValueError(f"Unknown mode '{mode}'")
 
 
+# ---------- Interactive CLI ----------
 if __name__ == "__main__":
     print("✅ IngredientEngine (AI-only, consistent ratings) loaded successfully!")
     engine = IngredientEngine()
@@ -140,7 +172,13 @@ if __name__ == "__main__":
         if q.lower() in {"quit", "exit"}:
             break
 
-        print("\n🌸 [Blurb Output]")
+        # 🧩 Always generate schema first (sets the rating)
+        schema = engine.generate(q, mode="schema")
+        print("\n🧩 [AI JSON Schema]")
+        print(schema.explanation.text, "\n")
+
+        # 🌸 Then run the others, now that rating is cached
+        print("🌸 [Blurb Output]")
         blurb = engine.generate(q, mode="blurb")
         print(blurb.explanation.text, "\n")
 
@@ -148,6 +186,3 @@ if __name__ == "__main__":
         overview = engine.generate(q, mode="overview")
         print(overview.explanation.text, "\n")
 
-        print("🧩 [AI JSON Schema]")
-        schema = engine.generate(q, mode="schema")
-        print(schema.explanation.text, "\n")

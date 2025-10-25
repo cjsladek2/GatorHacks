@@ -31,7 +31,8 @@ def build_prompt(
     if mode == "blurb":
         task = (
             "Write a 2-sentence layperson summary of the ingredient below, "
-            "highlighting its function and overall safety. Avoid jargon and long explanations."
+            "highlighting its function and overall safety, but do **NOT** include a decimal safety rating."
+            "Avoid jargon and long explanations."
         )
 
     elif mode == "overview":
