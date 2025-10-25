@@ -3,6 +3,7 @@ from typing import Optional, Dict, List
 from dotenv import load_dotenv
 import os
 import json
+import re
 
 from .core.models import Explanation, IngredientAnalysis
 from .core.prompts import DISCLAIMER
@@ -13,7 +14,8 @@ from .adapters.openai_summarizer import OpenAISummarizer
 class IngredientEngine:
     """
     AI-only ingredient engine with strict, persistent safety rating consistency,
-    plus a memory-aware conversational chatbot mode with suggested questions.
+    a memory-aware conversational chatbot mode with suggested questions,
+    🆕 and an en-masse ingredients list analyzer for OCR label parsing.
     """
 
     def __init__(self, cache_file: str = "ingredx_cache.json"):
@@ -86,16 +88,11 @@ class IngredientEngine:
 
         # ---------- Chat mode special handling ----------
         if mode == "chat":
-            # store conversation context
             self.chat_history.append({"role": "user", "content": ingredient_name})
-
             chat_prompt = self._build_chat_prompt(language=output_language)
             text_output = self.summarizer.summarize(chat_prompt, force_json=False)
-
-            # append response to history for memory continuity
             self.chat_history.append({"role": "assistant", "content": text_output})
 
-            # now generate suggested follow-up questions
             suggestion_prompt = (
                 "Based on this conversation, suggest 3-5 natural, concise follow-up questions "
                 "the user might ask next about ingredients, safety, or nutrition. "
@@ -192,31 +189,162 @@ class IngredientEngine:
             f"in ingredients, their chemical properties, uses, safety, and environmental effects.\n\n"
             f"Conversation so far:\n{context_snippets}\n\n"
             f"Continue the conversation naturally, focusing on things like:\n"
-            f"chemical Properties and Function\n"
-            f"common Uses\n"
-            f"safety and Controversy\n"
-            f"environmental and Regulatory Considerations\n\n"
+            f"Chemical Properties and Function\n"
+            f"Common Uses\n"
+            f"Safety and Controversy\n"
+            f"Environmental and Regulatory Considerations\n\n"
             f"or other fun facts!\n\n"
-            f"UNLESS the user has asked about a different food/health-related topic where such\n\n"
-            f"fields are not the topic of conversation\n\n"
             f"Be conversational but precise. Write in {language}."
         )
+
+    # ----------------------------------------------------------------------
+    # 🆕 INGREDIENT LIST EXTRACTION + BATCH ANALYSIS
+    # ----------------------------------------------------------------------
+
+    import re
+    from typing import List
+
+    import re
+    from typing import List
+
+    def extract_ingredients_from_text(self, raw_text: str) -> List[str]:
+        """
+        🧠 Final robust ingredient extractor.
+        Handles typos, missing spaces, periods as separators,
+        and fully infers ingredient lists even without headers.
+        """
+
+        if not raw_text or not raw_text.strip():
+            return []
+
+        text = raw_text.strip()
+
+        # Normalize OCR noise
+        text = re.sub(r"[\n\r\t|*_•·]+", " ", text)
+        text = re.sub(r"\s{2,}", " ", text).strip()
+
+        # ---------- 1️⃣ Fuzzy match for 'ingredients' section ----------
+        match = re.search(
+            r"ingr[eai]{0,2}d[iy]?e?n?t?s?\s*[:\-–_—]*\s*(.*)",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if match:
+            section = match.group(1)
+            section = re.split(
+                r"(contains|manufactured|nutrition|distributed|may contain|allergen|storage|warning)",
+                section,
+                flags=re.IGNORECASE,
+            )[0]
+        else:
+            section = None
+
+        # ---------- 2️⃣ If no header, infer likely ingredient text ----------
+        if not section:
+            delimiters = len(re.findall(r"[;,/\.]", text))
+            word_count = len(text.split())
+
+            if delimiters >= 2 and word_count < 80:
+                section = text
+            else:
+                probable = re.search(
+                    r"([A-Z][a-z]+\s*(?:[,;/\.]\s*[A-Za-z() ]+){2,})",
+                    text,
+                    re.DOTALL,
+                )
+                if probable:
+                    section = probable.group(1)
+
+        if not section:
+            return []
+
+        # ---------- 3️⃣ Normalize delimiters (handle missing spaces) ----------
+        section = re.sub(r"([;,/\.])(?=[A-Za-z])", r"\1 ", section)
+        section = section.replace(";", ",").replace("/", ",").replace(".", ",")
+        section = re.sub(r"[^a-zA-Z0-9(),.\s-]", " ", section)
+        section = re.sub(r"\s{2,}", " ", section).strip()
+
+        # ---------- 4️⃣ Split and clean ----------
+        parts = re.split(r",(?![^()]*\))", section)
+        cleaned = []
+
+        for p in parts:
+            p = p.strip(" .;:-").title()
+            if (
+                    len(p) > 1
+                    and not p.isdigit()
+                    and not re.match(r"contains|manufactured|warning", p, re.I)
+            ):
+                # Break apart cases like "Etda Tomatoes" if joined by a period or missing comma
+                subparts = re.split(r"\s{2,}|(?<!\b[A-Z])[.]", p)
+                for s in subparts:
+                    s = s.strip(" .;:-").title()
+                    if len(s) > 1 and s.lower() not in ["and", "or"]:
+                        cleaned.append(s)
+
+        # ---------- 5️⃣ Deduplicate, preserve order ----------
+        seen = set()
+        final = []
+        for item in cleaned:
+            if item.lower() not in seen:
+                seen.add(item.lower())
+                final.append(item)
+
+        return final
+
+    def analyze_ingredient_list(self, raw_text: str, language: str = "en") -> Dict[str, Dict]:
+        """
+        🧩 Extracts all ingredients from messy label text and analyzes them in bulk.
+        Returns:
+        {
+          "ingredients": [...],
+          "blurbs": {...},
+          "schemas": {...}
+        }
+        """
+        ingredients = self.extract_ingredients_from_text(raw_text)
+        if not ingredients:
+            return {"error": "No ingredient list found."}
+
+        blurbs = {}
+        schemas = {}
+
+        for ing in ingredients:
+            try:
+                blurb = self.generate(ing, mode="blurb", output_language=language)
+                schema = self.generate(ing, mode="schema", output_language=language)
+                blurbs[ing] = blurb.explanation.text
+                schemas[ing] = json.loads(schema.explanation.text)
+            except Exception as e:
+                blurbs[ing] = f"[Error: {e}]"
+                schemas[ing] = {}
+
+        return {
+            "ingredients": ingredients,
+            "blurbs": blurbs,
+            "schemas": schemas,
+        }
 
 
 # ---------- Interactive CLI ----------
 if __name__ == "__main__":
-    print("✅ IngredientEngine (AI-only, memory-aware chat) loaded successfully!")
+    print("✅ IngredientEngine (AI-only, memory-aware chat + list analyzer) loaded successfully!")
     engine = IngredientEngine()
     print("✅ Engine initialized with OpenAI.\n")
 
     while True:
-        print("\n🧩 Choose mode: [blurb / overview / schema / chat / quit]")
+        print("\n🧩 Choose mode: [blurb / overview / schema / chat / list / quit]")
         mode = input("> ").strip().lower()
         if mode in {"quit", "exit"}:
             break
 
+        if mode == "list":
+            raw_text = input("📜 Paste full label text: ").strip()
+            results = engine.analyze_ingredient_list(raw_text)
+            print(json.dumps(results, indent=2, ensure_ascii=False))
+            continue
+
         q = input("👩‍🔬 Enter ingredient or question: ").strip()
         result = engine.generate(q, mode=mode)
-
         print(f"\n[{mode.upper()} Output]")
         print(result.explanation.text, "\n")
