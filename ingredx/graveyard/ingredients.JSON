@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ing_1",
+    "name": "sodium chloride",
+    "synonyms": ["salt", "table salt", "NaCl"],
+    "category": "flavoring",
+    "common_uses": ["seasoning", "preservative"],
+    "warnings": [],
+    "allergens": [],
+    "safety_score": 85,
+    "evidence_level": "moderate",
+    "eco_impact": "low",
+    "regulatory_status": "GRAS (US FDA)",
+    "references": [
+      {"title": "FDA GRAS Notice - Sodium Chloride", "url": "https://www.fda.gov/"}
+    ]
+  },
+  {
+    "id": "ing_2",
+    "name": "sodium lauryl sulfate",
+    "synonyms": ["SLS"],
+    "category": "surfactant",
+    "common_uses": ["cleanser", "foaming agent"],
+    "warnings": ["may irritate skin in high concentrations"],
+    "allergens": [],
+    "safety_score": 60,
+    "evidence_level": "moderate",
+    "eco_impact": "moderate",
+    "regulatory_status": "Restricted in some leave-on products",
+    "references": []
+  }
+]
