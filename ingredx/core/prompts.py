@@ -2,6 +2,10 @@ from __future__ import annotations
 from typing import Optional
 from .models import IngredientRecord
 
+# ---------------------------------------------------------------------
+# CONSTANTS
+# ---------------------------------------------------------------------
+
 DISCLAIMER = (
     "This information is educational and not medical advice. "
     "For specific health concerns, consult a qualified professional."
@@ -13,26 +17,31 @@ SYSTEM_SUMMARY = (
     "about cosmetic, food, and chemical ingredients. Avoid pseudoscience and always stay factual."
 )
 
+# ---------------------------------------------------------------------
+# PROMPT BUILDER
+# ---------------------------------------------------------------------
 
 def build_prompt(
     rec: Optional[IngredientRecord],
     matched_name: Optional[str],
     language: str,
-    mode: str = "overview",  # "blurb" | "overview" | "schema"
+    mode: str = "overview",  # "blurb" | "overview" | "schema" | "chat"
 ) -> str:
     """
-    Build a language-specific LLM prompt for one of three modes:
+    Build a language-specific LLM prompt for one of four modes:
       - blurb: 2-sentence summary
-      - overview: full detailed human-readable overview
-      - schema: JSON structured scientific report
+      - overview: detailed, human-readable analysis
+      - schema: structured JSON
+      - chat: conversational Q&A mode
     """
     ingredient_name = rec.name if rec else matched_name or "unknown ingredient"
 
     if mode == "blurb":
         task = (
-            "Write a 2-sentence layperson summary of the ingredient below, "
-            "highlighting its function and overall safety, but do **NOT** include a decimal safety rating."
-            "Avoid jargon and long explanations."
+            "Write a short, friendly, and accurate 2-sentence summary of the ingredient below. "
+            "Explain what it is and what it does, including general safety information in plain terms. "
+            "Do NOT include numeric safety ratings or decimal scores. Avoid jargon. "
+            "Keep the tone approachable and clear for everyday consumers."
         )
 
     elif mode == "overview":
@@ -46,25 +55,38 @@ def build_prompt(
             "5. Environmental and Regulatory Considerations\n"
             "6. Overall Health Safety Rating (decimal 0–1)\n"
             "7. Edibility (yes/no, is it safe for human consumption)\n\n"
-            "Use clear formatting with section headers and paragraph text. "
-            "Do NOT output JSON or bullet lists—just text paragraphs. "
-            "Focus on factual accuracy and consumer relevance."
+            "Use full sentences and natural formatting — no bullet points, no JSON. "
+            "Write clearly, using accessible language grounded in science."
         )
 
     elif mode == "schema":
         task = (
-            "Return ONLY valid JSON (no markdown, code fencing, or commentary). "
-            "The JSON must include the following keys and scientifically grounded values:\n\n"
+            "Return ONLY valid JSON (no markdown, no code blocks, no commentary). "
+            "The JSON must include the following keys with scientifically accurate values:\n\n"
             "{\n"
-            '  "common_synonyms": "comma-separated list",\n'
-            '  "chemical_properties": "short scientific description of structure and function",\n'
-            '  "common_uses": "typical commercial, industrial, or household uses",\n'
-            '  "safety_and_controversy": "balanced discussion of health impacts",\n'
-            '  "environmental_and_regulation": "biodegradability, eco-toxicity, regulation",\n'
+            '  "common_synonyms": "comma-separated list of known synonyms",\n'
+            '  "chemical_properties": "description of structure, function, and key characteristics",\n'
+            '  "common_uses": "description of typical household, industrial, or biological uses",\n'
+            '  "safety_and_controversy": "discussion of health risks, debates, or restrictions",\n'
+            '  "environmental_and_regulation": "notes on biodegradability, eco-toxicity, and legal status",\n'
             '  "health_safety_rating": float between 0 and 1,\n'
             '  "edible": boolean (true/false)\n'
             "}\n\n"
-            "Return ONLY the JSON object, without commentary."
+            "Output ONLY the JSON object, nothing else. No markdown or commentary."
+        )
+
+    elif mode == "chat":
+        task = (
+            "You are a friendly, scientifically accurate health and nutrition assistant. "
+            "Engage in a natural conversation with the user about ingredient safety, chemical properties, and usage. "
+            "Always ground your responses in real chemistry, toxicology, or nutrition science. "
+            "Focus on explaining clearly:\n"
+            "1. Chemical Properties and Function\n"
+            "2. Common Uses\n"
+            "3. Safety and Controversy\n"
+            "4. Environmental and Regulatory Considerations\n\n"
+            "Answer conversationally, but stay factual and balanced. "
+            "If unsure, say what is and isn’t known. Keep the tone approachable and warm."
         )
 
     else:
@@ -73,6 +95,6 @@ def build_prompt(
     return (
         f"{SYSTEM_SUMMARY}\n\n"
         f"Language: {language}\n"
-        f"Ingredient: {ingredient_name}\n\n"
+        f"Ingredient or topic: {ingredient_name}\n\n"
         f"Task: {task}"
     )

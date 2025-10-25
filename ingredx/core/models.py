@@ -32,29 +32,37 @@ class MatchResult(BaseModel):
     was_translated: bool = False
     detected_language: Optional[str] = None
 
-# Updated to support new modes
-DetailLevel = Literal["blurb", "overview", "schema"]
+
+# ✅ Updated to support new modes (added "chat")
+DetailLevel = Literal["blurb", "overview", "schema", "chat"]
+
 
 class Explanation(BaseModel):
     detail_level: DetailLevel
     language: str
     text: str
 
+
 class IngredientAnalysis(BaseModel):
     ingredient_input: str
     translated_name: Optional[str] = None
-    match: Optional[MatchResult] = None  # ✅ allow None
+    match: Optional[MatchResult] = None
     data: Optional[IngredientRecord] = None
     explanation: Explanation
     disclaimer: str
 
 
 class ChatAnswer(BaseModel):
+    """
+    Used for interactive Q&A mode.
+    Includes both the assistant's response and suggested next questions.
+    """
     schema_version: str = "1.0.0"
     question: str
     language: str = "en"
     explanation: Explanation
     referenced_ingredients: List[str] = []
+    suggested_questions: Optional[List[str]] = None
     disclaimer: str
 
 

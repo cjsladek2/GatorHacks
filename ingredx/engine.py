@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from dotenv import load_dotenv
 import os
 import json
@@ -12,7 +12,8 @@ from .adapters.openai_summarizer import OpenAISummarizer
 
 class IngredientEngine:
     """
-    AI-only ingredient engine with strict, persistent safety rating consistency.
+    AI-only ingredient engine with strict, persistent safety rating consistency,
+    plus a memory-aware conversational chatbot mode with suggested questions.
     """
 
     def __init__(self, cache_file: str = "ingredx_cache.json"):
@@ -21,6 +22,7 @@ class IngredientEngine:
         self.translator = OpenAITranslator()
         self.cache_file = cache_file
         self._memory: Dict[str, Dict[str, float]] = self._load_cache()
+        self.chat_history: List[Dict[str, str]] = []  # 🧠 conversation memory
 
     # ---------- Persistent cache helpers ----------
     def _load_cache(self) -> Dict[str, Dict[str, float]]:
@@ -44,20 +46,17 @@ class IngredientEngine:
     # ---------- Main generation entry ----------
     def generate(self, ingredient_name: str, mode: str = "overview", output_language: str = "en"):
         """
-        Generate either a short blurb, a detailed overview, or a structured JSON schema
-        describing the ingredient.
+        Generate a short blurb, detailed overview, structured JSON schema, or chatbot reply.
         """
         name_key = ingredient_name.lower().strip()
 
-        # ✅ always reload cache before generation (ensures same value across runs)
+        # reload cache each time
         self._memory = self._load_cache()
 
-        # ✅ load known rating if available
         known_rating = None
         if name_key in self._memory:
             known_rating = self._memory[name_key].get("health_safety_rating")
 
-        # ✅ pass rating hint into prompt
         prompt = self._build_generation_prompt(
             ingredient_name,
             mode=mode,
@@ -65,26 +64,45 @@ class IngredientEngine:
             known_rating=known_rating,
         )
 
-        # ✅ force JSON only for schema mode
+        # schema mode = force JSON
         force_json = (mode == "schema")
         text_output = self.summarizer.summarize(prompt, force_json=force_json)
 
-        # ✅ if schema, extract and persist health_safety_rating
+        # save rating if schema mode
         if mode == "schema":
             try:
                 parsed = json.loads(text_output)
                 rating = float(parsed.get("health_safety_rating"))
                 if 0 <= rating <= 1:
-                    # cache both rating and all schema data
                     self._memory[name_key] = parsed
                     self._save_cache()
                     known_rating = rating
             except Exception:
                 pass
 
-        # ✅ for overview/blurb, inject the rating value directly if known
+        # include rating only in overview text
         if known_rating is not None and mode == "overview":
             text_output = f"{text_output.strip()}\n\n[Health Rating: {known_rating:.2f}]"
+
+        # ---------- Chat mode special handling ----------
+        if mode == "chat":
+            # store conversation context
+            self.chat_history.append({"role": "user", "content": ingredient_name})
+
+            chat_prompt = self._build_chat_prompt(language=output_language)
+            text_output = self.summarizer.summarize(chat_prompt, force_json=False)
+
+            # append response to history for memory continuity
+            self.chat_history.append({"role": "assistant", "content": text_output})
+
+            # now generate suggested follow-up questions
+            suggestion_prompt = (
+                "Based on this conversation, suggest 3-5 natural, concise follow-up questions "
+                "the user might ask next about ingredients, safety, or nutrition. "
+                "Return ONLY a numbered list and no other comments."
+            )
+            suggestions = self.summarizer.summarize(suggestion_prompt, force_json=False)
+            text_output = f"{text_output.strip()}\n\n💡 Suggested follow-ups:\n{suggestions.strip()}"
 
         explanation = Explanation(
             detail_level=mode,
@@ -101,7 +119,7 @@ class IngredientEngine:
             disclaimer=DISCLAIMER,
         )
 
-    # ---------- Prompt builder ----------
+    # ---------- Prompt builders ----------
     def _build_generation_prompt(
         self,
         ingredient_name: str,
@@ -109,7 +127,7 @@ class IngredientEngine:
         language: str,
         known_rating: Optional[float] = None,
     ) -> str:
-        """Construct the correct LLM prompt for each mode."""
+        """Build LLM prompts for non-chat modes."""
         rating_hint = (
             f"The ingredient '{ingredient_name}' already has an established health safety rating of "
             f"{known_rating:.2f} on a scale of 0–1. You must use this exact value consistently.\n\n"
@@ -157,32 +175,48 @@ class IngredientEngine:
                 "Return ONLY valid JSON with no commentary, explanation, or markdown."
             )
 
+        elif mode == "chat":
+            return self._build_chat_prompt(language)
+
         else:
             raise ValueError(f"Unknown mode '{mode}'")
+
+    # ---------- Chat prompt builder ----------
+    def _build_chat_prompt(self, language: str) -> str:
+        """Constructs a context-rich chat prompt including memory."""
+        context_snippets = "\n".join(
+            f"{msg['role'].capitalize()}: {msg['content']}" for msg in self.chat_history[-8:]
+        )
+        return (
+            f"You are a friendly, scientifically accurate nutrition and chemistry assistant specializing "
+            f"in ingredients, their chemical properties, uses, safety, and environmental effects.\n\n"
+            f"Conversation so far:\n{context_snippets}\n\n"
+            f"Continue the conversation naturally, focusing on things like:\n"
+            f"chemical Properties and Function\n"
+            f"common Uses\n"
+            f"safety and Controversy\n"
+            f"environmental and Regulatory Considerations\n\n"
+            f"or other fun facts!\n\n"
+            f"UNLESS the user has asked about a different food/health-related topic where such\n\n"
+            f"fields are not the topic of conversation\n\n"
+            f"Be conversational but precise. Write in {language}."
+        )
 
 
 # ---------- Interactive CLI ----------
 if __name__ == "__main__":
-    print("✅ IngredientEngine (AI-only, consistent ratings) loaded successfully!")
+    print("✅ IngredientEngine (AI-only, memory-aware chat) loaded successfully!")
     engine = IngredientEngine()
     print("✅ Engine initialized with OpenAI.\n")
 
     while True:
-        q = input("👩‍🔬 Enter ingredient (or 'quit'): ").strip()
-        if q.lower() in {"quit", "exit"}:
+        print("\n🧩 Choose mode: [blurb / overview / schema / chat / quit]")
+        mode = input("> ").strip().lower()
+        if mode in {"quit", "exit"}:
             break
 
-        # 🧩 Always generate schema first (sets the rating)
-        schema = engine.generate(q, mode="schema")
-        print("\n🧩 [AI JSON Schema]")
-        print(schema.explanation.text, "\n")
+        q = input("👩‍🔬 Enter ingredient or question: ").strip()
+        result = engine.generate(q, mode=mode)
 
-        # 🌸 Then run the others, now that rating is cached
-        print("🌸 [Blurb Output]")
-        blurb = engine.generate(q, mode="blurb")
-        print(blurb.explanation.text, "\n")
-
-        print("📘 [Overview Output]")
-        overview = engine.generate(q, mode="overview")
-        print(overview.explanation.text, "\n")
-
+        print(f"\n[{mode.upper()} Output]")
+        print(result.explanation.text, "\n")
