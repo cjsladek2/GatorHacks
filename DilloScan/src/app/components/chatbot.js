@@ -6,7 +6,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef(null); // for auto-scroll
+  const messagesEndRef = useRef(null);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -17,7 +17,6 @@ export default function Chatbot() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate typing delay
     setTimeout(() => {
       const botMsg = {
         text: `This is a simulated response about the ingredient: ${userMsg.text}`,
@@ -28,15 +27,14 @@ export default function Chatbot() {
     }, 1000);
   };
 
-  // Scroll to the bottom whenever messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto mt-6 rounded-3xl bg-gradient-to-br from-white/90 to-[#f8fbff]/90 dark:from-gray-900/80 dark:to-gray-800/80 shadow-xl border border-white/40 dark:border-gray-700 backdrop-blur-lg overflow-hidden flex flex-col">
+    <div className="relative w-full max-w-3xl mx-auto mt-6 rounded-3xl bg-gradient-to-br from-white/90 to-[#f8fbff]/90 dark:from-gray-900/80 dark:to-gray-800/80 shadow-xl border border-white/40 dark:border-gray-700 backdrop-blur-lg flex flex-col overflow-hidden h-[550px]">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-green-50 dark:from-[#151529] dark:to-[#1b1b33]">
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-green-50 dark:from-[#151529] dark:to-[#1b1b33] shrink-0">
         <h3 className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-green-500">
           Ask an Armadillo!
         </h3>
@@ -45,8 +43,8 @@ export default function Chatbot() {
         </p>
       </div>
 
-      {/* Chat Window */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 scrollbar-thin scrollbar-thumb-indigo-200 dark:scrollbar-thumb-indigo-700">
+      {/* Scrollable Messages Area */}
+      <div className="flex-1 px-6 py-4 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-200 dark:scrollbar-thumb-indigo-700">
         {messages.length === 0 && (
           <p className="text-gray-500 text-center italic mt-20">
             Start by typing an ingredient below...
@@ -63,7 +61,7 @@ export default function Chatbot() {
             <div
               className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm transition-all duration-300 ${
                 msg.sender === "user"
-                  ? "bg-gradient-to-r from-indigo-400/20 to-green-300/20 text-gray-800 dark:text-gray-200 border border-indigo-200 dark:border-indigo-700"
+                  ? "bg-gradient-to-r from-indigo-400/15 to-green-300/15 text-gray-800 dark:text-gray-200 border border-indigo-200 dark:border-indigo-700"
                   : "bg-gray-100 dark:bg-gray-700/70 text-gray-800 dark:text-gray-200"
               }`}
             >
@@ -85,10 +83,10 @@ export default function Chatbot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
+      {/* Input Bar (fixed bottom) */}
       <form
         onSubmit={handleSend}
-        className="flex items-center gap-3 p-4 bg-white/80 dark:bg-gray-900/80 border-t border-gray-100 dark:border-gray-700 backdrop-blur-md"
+        className="flex items-center gap-3 p-4 bg-white/80 dark:bg-gray-900/80 border-t border-gray-100 dark:border-gray-700 backdrop-blur-md shrink-0"
       >
         <input
           type="text"
