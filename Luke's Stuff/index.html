@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Gatordillo</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; }
+      #preview { max-width: 100%; max-height: 300px; display: block; margin-top: 1rem; }
+      #output { white-space: pre-wrap; background: #f6f8fa; padding: 1rem; border-radius: 6px; margin-top: 1rem; }
+      #progress { margin-top: 0.5rem; color: #555; }
+    </style>
+  </head>
+  <body>
+    <h1>OCR an image</h1>
+    <input type="file" accept="image/*" id="file" />
+    <button id="run">Read text</button>
+    <div id="progress"></div>
+    <img id="preview" alt="preview" />
+    <pre id="output"></pre>
+
+    <!-- Load Tesseract.js from CDN -->
+    <script src="https://unpkg.com/tesseract.js/dist/tesseract.min.js"></script>
+    <script>
+      const fileInput = document.getElementById('file');
+      const runBtn = document.getElementById('run');
+      const preview = document.getElementById('preview');
+      const progress = document.getElementById('progress');
+      const output = document.getElementById('output');
+
+      let objectUrl = null;
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+      });
+
+      runBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) {
+          alert('Choose an image first.');
+          return;
+        }
+        progress.textContent = 'Starting OCR...';
+        output.textContent = '';
+
+        try {
+          const { data } = await Tesseract.recognize(file, 'eng', {
+            logger: m => {
+              const pct = m.progress ? Math.round(m.progress * 100) : 0;
+              progress.textContent = `${m.status}${m.progress ? ` (${pct}%)` : ''}`;
+            }
+          });
+          output.textContent = data.text.trim();
+        } catch (err) {
+          console.error(err);
+          progress.textContent = 'Error during OCR.';
+        }
+      });
+    </script>
+  </body>
+</html>
