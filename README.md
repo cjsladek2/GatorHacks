@@ -38,3 +38,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 =======
 # GatorHacks
 >>>>>>> 6cf88da5875d8b154fdac5697c013ef5c8ea5e24
+# Scanadillo
