@@ -1,13 +1,12 @@
 "use client"
 import { useState, useEffect, useRef } from "react";
-import Tesseract from "tesseract.js";
 
-export default function ImageUpload({ onFakeData }) {
+export default function ImageUpload({ onIngredientsAnalyzed }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const [ingredients, setIngredients] = useState([]);
+  const [analyzing, setAnalyzing] = useState(false);
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -66,6 +65,35 @@ export default function ImageUpload({ onFakeData }) {
     setVideoReady(false);
   };
 
+  // 🆕 ANALYZE IMAGE WITH API
+  const analyzeImage = async (imageData) => {
+    setAnalyzing(true);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/analyze-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image: imageData })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Pass the analyzed data back to parent component
+        onIngredientsAnalyzed(result);
+      } else {
+        alert('Error analyzing image: ' + result.error);
+      }
+    } catch (error) {
+      console.error('API Error:', error);
+      alert('Could not connect to analysis server. Make sure the Python API is running on port 5000.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   // Take snapshot
   const takePhoto = () => {
     if (!videoRef.current || !videoReady) {
@@ -84,11 +112,10 @@ export default function ImageUpload({ onFakeData }) {
 
     localStorage.setItem("uploadedImage", imageData);
 
-    // Simulated OCR/fake ingredient data
-    const fakeIngredients = ["Sugar", "Palm Oil", "Whey Protein", "Vitamin D"];
-    if (onFakeData) onFakeData(fakeIngredients);
-
     stopCamera();
+    
+    // Analyze the captured photo
+    analyzeImage(imageData);
   };
 
   const cancelCamera = () => {
@@ -118,9 +145,8 @@ export default function ImageUpload({ onFakeData }) {
 
         localStorage.setItem("uploadedImage", imageData);
 
-        // Simulated OCR/fake ingredient data
-        const fakeIngredients = ["Sugar", "Palm Oil", "Whey Protein", "Vitamin D"];
-        if (onFakeData) onFakeData(fakeIngredients);
+        // Analyze the uploaded image
+        analyzeImage(imageData);
       };
       reader.readAsDataURL(file);
     }
@@ -129,55 +155,18 @@ export default function ImageUpload({ onFakeData }) {
   function handleUploadNew() {
     setSelectedImage(null);
     localStorage.removeItem("uploadedImage");
-  }
-  
-  function parseIngredientsFromText(text) {
-    const lower = text.toLowerCase();
-    const startIdx = 0;//lower.indexOf("ingredients");
-    if (startIdx === -1) return [];
-    const tail = text.slice(startIdx);
-    const colonIdx = tail.indexOf(":");
-    const endBreakIdx = tail.indexOf("\n");
-    const section = tail.slice(
-      colonIdx > -1 ? colonIdx + 1 : 0,
-      endBreakIdx > -1 ? endBreakIdx : tail.length
-    );
-    return section
-      .split(/[;,]/)
-      .map(s => s.replace(/\([^)]*\)/g, "").trim())
-      .filter(Boolean)
-      .map(s => s.replace(/\s+/g, " "));
+    onIngredientsAnalyzed(null); // Clear ingredients
   }
 
-  async function checkIngredients() {
-    if (!selectedImage) return;
-    setIsChecking(true);
-    try {
-      const { data: { text } } = await Tesseract.recognize(selectedImage, "eng", {
-        logger: m => console.log(m) // optional: progress logs
-      });
-	  console.log(text);
-      const list = parseIngredientsFromText(text);
-	  console.log(list);
-      setIngredients(list);
-      if (onFakeData) onFakeData(list); // reuse your callback with real data
-    } catch (err) {
-      console.error("OCR error:", err);
-      alert("Failed to read text from image.");
-    } finally {
-      setIsChecking(false);
-    }
-  }
-
-  return (	
+  return (
     <div className="flex flex-col items-center">
       <h2 className="text-xl font-semibold mb-4">Upload Nutrition Label</h2>
 
       {/* Box around file input */}
       {!selectedImage && !cameraActive && (
         <div className="flex flex-col space-y-4">
-          <label className="w-64 h-32 border-2 border-dashed border-gray-400 rounded flex items-center justify-center cursor-pointer hover:border-gray-600 transition">
-            <span className="text-gray-500">Click to choose file</span>
+          <label className="w-64 h-32 border-2 border-dashed border-gray-400 rounded flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all">
+            <span className="text-gray-500">📁 Click to choose file</span>
             <input
               type="file"
               accept="image/*"
@@ -189,9 +178,9 @@ export default function ImageUpload({ onFakeData }) {
           {/* Take photo button */}
           <button
             onClick={startCamera}
-            className="w-64 h-12 border-2 border-dashed border-gray-400 rounded flex items-center justify-center hover:border-gray-600 transition"
+            className="w-64 h-12 border-2 border-dashed border-gray-400 rounded flex items-center justify-center hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all"
           >
-            Take a Photo
+            📸 Take a Photo
           </button>
         </div>
       )}
@@ -202,14 +191,17 @@ export default function ImageUpload({ onFakeData }) {
           <div className="relative w-full">
             <video 
               ref={videoRef} 
-              className="w-full h-96 border rounded bg-black object-cover" 
+              className="w-full h-96 border-2 border-indigo-200 rounded-lg bg-black object-cover shadow-lg" 
               autoPlay 
               playsInline
               muted
             />
             {!videoReady && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-white text-lg">Loading camera...</p>
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-900/50 to-blue-900/50 rounded-lg">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-3"></div>
+                  <p className="text-white text-lg font-medium">Loading camera...</p>
+                </div>
               </div>
             )}
           </div>
@@ -217,13 +209,13 @@ export default function ImageUpload({ onFakeData }) {
             <button
               onClick={takePhoto}
               disabled={!videoReady}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
             >
-              Capture Photo
+              📷 Capture Photo
             </button>
             <button
               onClick={cancelCamera}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+              className="px-6 py-3 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-all font-semibold"
             >
               Cancel
             </button>
@@ -237,33 +229,31 @@ export default function ImageUpload({ onFakeData }) {
           <img
             src={selectedImage}
             alt="Selected nutrition label"
-            className="max-w-md border rounded p-2 mt-2"
+            className="max-w-md border-2 border-indigo-200 rounded-lg shadow-lg p-2 mt-2"
           />
-          <div className="flex space-x-4 mt-4">
-            <button
-              onClick={checkIngredients}
-              disabled={isChecking}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {isChecking ? "Scanning..." : "Check Ingredients"}
-            </button>
+          
+          {analyzing && (
+            <div className="mt-6 flex flex-col items-center space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                <span className="text-gray-700 dark:text-gray-300 font-medium">Analyzing ingredients...</span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Using AI to extract and analyze nutrition data
+              </p>
+            </div>
+          )}
+          
+          {!analyzing && (
             <button
               onClick={handleUploadNew}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+              className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-500 to-green-400 text-white rounded-full hover:shadow-lg transition-all font-semibold"
             >
               Upload New Image
             </button>
-          </div>
-
-          {ingredients.length > 0 && (
-            <div className="mt-4">
-              <p className="font-medium">Detected ingredients:</p>
-              <p>{ingredients.join(", ")}</p>
-            </div>
           )}
         </div>
       )}
     </div>
-	
   );
 }

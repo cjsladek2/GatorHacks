@@ -1,83 +1,116 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
-export default function Chatbot() {
-  const [messages, setMessages] = useState([]);
+export default function Chatbot({ ingredients, analysisData }) {
+  const [messages, setMessages] = useState([
+    {
+      role: "assistant",
+      content: "Hi! I'm your ingredient analysis assistant. Ask me anything about the ingredients in your scanned label!",
+    },
+  ]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef(null); // for auto-scroll
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMsg = { text: input, sender: "user" };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsTyping(true);
-
-    // Simulate typing delay
-    setTimeout(() => {
-      const botMsg = {
-        text: `This is a simulated response about the ingredient: ${userMsg.text}`,
-        sender: "bot",
-      };
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-    }, 1000);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Scroll to the bottom whenever messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
+    scrollToBottom();
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMessage = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: input }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const botMessage = { role: "assistant", content: result.response };
+        setMessages((prev) => [...prev, botMessage]);
+      } else {
+        const errorMessage = {
+          role: "assistant",
+          content: "Sorry, I encountered an error: " + result.error,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      const errorMessage = {
+        role: "assistant",
+        content: "Could not connect to the chat server. Make sure the API is running.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto mt-6 rounded-3xl bg-gradient-to-br from-white/90 to-[#f8fbff]/90 dark:from-gray-900/80 dark:to-gray-800/80 shadow-xl border border-white/40 dark:border-gray-700 backdrop-blur-lg overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-green-50 dark:from-[#151529] dark:to-[#1b1b33]">
-        <h3 className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-green-500">
-          Ask an Armadillo!
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Curious about ingredients, additives, or what’s hiding on a label? Ask away.
-        </p>
-      </div>
+    <div className="glass p-6 rounded-3xl shadow-xl max-w-4xl mx-auto">
+      <h3 className="text-2xl font-bold mb-6 text-indigo-600">AI Chatbot</h3>
 
-      {/* Chat Window */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 scrollbar-thin scrollbar-thumb-indigo-200 dark:scrollbar-thumb-indigo-700">
-        {messages.length === 0 && (
-          <p className="text-gray-500 text-center italic mt-20">
-            Start by typing an ingredient below...
+      {/* Context Info */}
+      {ingredients && ingredients.length > 0 && (
+        <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            💡 <strong>Context loaded:</strong> {ingredients.length} ingredient{ingredients.length !== 1 ? 's' : ''} from your scan
           </p>
-        )}
+        </div>
+      )}
 
-        {messages.map((msg, i) => (
+      {/* Messages Container */}
+      <div className="h-96 overflow-y-auto mb-4 space-y-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+        {messages.map((message, index) => (
           <div
-            key={i}
-            className={`chat-pop flex ${
-              msg.sender === "user" ? "justify-end" : "justify-start"
+            key={index}
+            className={`flex ${
+              message.role === "user" ? "justify-end" : "justify-start"
             }`}
           >
             <div
-              className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm transition-all duration-300 ${
-                msg.sender === "user"
-                  ? "bg-gradient-to-r from-indigo-400/20 to-green-300/20 text-gray-800 dark:text-gray-200 border border-indigo-200 dark:border-indigo-700"
-                  : "bg-gray-100 dark:bg-gray-700/70 text-gray-800 dark:text-gray-200"
+              className={`max-w-[80%] p-4 rounded-2xl ${
+                message.role === "user"
+                  ? "bg-gradient-to-r from-indigo-500 to-blue-500 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
               }`}
             >
-              {msg.text}
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             </div>
           </div>
         ))}
 
-        {isTyping && (
+        {loading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-1 px-3 py-2 rounded-2xl bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 shadow-sm">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+              </div>
             </div>
           </div>
         )}
@@ -85,25 +118,48 @@ export default function Chatbot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <form
-        onSubmit={handleSend}
-        className="flex items-center gap-3 p-4 bg-white/80 dark:bg-gray-900/80 border-t border-gray-100 dark:border-gray-700 backdrop-blur-md"
-      >
+      {/* Input Area */}
+      <div className="flex space-x-2">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about an ingredient..."
-          className="flex-grow px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 placeholder-gray-400 text-sm"
+          onKeyPress={handleKeyPress}
+          placeholder="Ask about ingredients, safety, nutrition..."
+          className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-700 rounded-full focus:outline-none focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+          disabled={loading}
         />
         <button
-          type="submit"
-          className="px-5 py-2 rounded-full bg-gradient-to-r from-indigo-500 to-green-400 text-white font-medium shadow-md hover:shadow-lg hover:scale-105 transition-transform duration-300"
+          onClick={sendMessage}
+          disabled={loading || !input.trim()}
+          className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
         >
-          Send
+          {loading ? "..." : "Send"}
         </button>
-      </form>
+      </div>
+
+      {/* Suggested Questions */}
+      {!loading && messages.length <= 2 && ingredients && ingredients.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Try asking:</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Which ingredients should I avoid?",
+              "What are the healthiest ingredients?",
+              "Are there any allergens?",
+              "Explain the preservatives",
+            ].map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => setInput(suggestion)}
+                className="text-xs px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full hover:border-indigo-500 transition-all"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
