@@ -46,8 +46,13 @@ export default function Chatbot() {
       {/* Scrollable Messages Area */}
       <div className="flex-1 px-6 py-4 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-200 dark:scrollbar-thumb-indigo-700">
         {messages.length === 0 && (
+<<<<<<< HEAD
           <p className="text-gray-500 text-center italic mt-45">
             Start by typing your question below...
+=======
+          <p className="text-gray-500 text-center italic mt-20">
+            Start by typing an ingredient below...
+>>>>>>> 6cf88da5875d8b154fdac5697c013ef5c8ea5e24
           </p>
         )}
 

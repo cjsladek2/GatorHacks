@@ -1,0 +1,10 @@
+{
+  "source": "EPA SCIL",
+  "query": "Sodium lauryl sulfoacetate",
+  "facts": {},
+  "citations": [
+    "https://www.epa.gov/saferchoice/safer-ingredients",
+    "https://www.epa.gov/sites/default/files/2015-09/safer_chemical_ingredients_list.xls"
+  ],
+  "error": "Ingredient not found in SCIL."
+}
