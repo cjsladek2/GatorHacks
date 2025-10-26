@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useState, useEffect, useRef } from "react";
 
 export default function ImageUpload({ onIngredientsAnalyzed }) {
@@ -10,37 +10,28 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  // Start camera - sets state to show video element
-  const startCamera = () => {
-    setCameraActive(true);
-  };
+  const startCamera = () => setCameraActive(true);
 
-  // This runs AFTER the video element is rendered
   useEffect(() => {
     if (cameraActive && videoRef.current && !streamRef.current) {
       initializeCamera();
     }
   }, [cameraActive]);
 
-  // Actually initialize the camera stream
   const initializeCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "environment" } 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
       });
-      
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-
-        // Wait for metadata to load
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play()
-            .then(() => {
-              setVideoReady(true);
-            })
-            .catch(err => {
+          videoRef.current
+            .play()
+            .then(() => setVideoReady(true))
+            .catch((err) => {
               console.error("Play error:", err);
               alert("Could not play video: " + err.message);
             });
@@ -55,46 +46,33 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
 
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
     setVideoReady(false);
   };
 
-  // 🆕 ANALYZE IMAGE WITH API
   const analyzeImage = async (imageData) => {
     setAnalyzing(true);
-    
     try {
-      const response = await fetch('http://localhost:5000/api/analyze-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image: imageData })
+      const response = await fetch("http://localhost:5000/api/analyze-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageData }),
       });
-
       const result = await response.json();
-      
-      if (result.success) {
-        // Pass the analyzed data back to parent component
-        onIngredientsAnalyzed(result);
-      } else {
-        alert('Error analyzing image: ' + result.error);
-      }
+      if (result.success) onIngredientsAnalyzed(result);
+      else alert("Error analyzing image: " + result.error);
     } catch (error) {
-      console.error('API Error:', error);
-      alert('Could not connect to analysis server. Make sure the Python API is running on port 5000.');
+      console.error("API Error:", error);
+      alert("Could not connect to analysis server. Make sure the Python API is running on port 5000.");
     } finally {
       setAnalyzing(false);
     }
   };
 
-  // Take snapshot
   const takePhoto = () => {
     if (!videoRef.current || !videoReady) {
       alert("Video not ready yet, try again.");
@@ -108,29 +86,20 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
     ctx.drawImage(videoRef.current, 0, 0);
 
     const imageData = canvas.toDataURL("image/png");
-    setSelectedImage(imageData); 
-
+    setSelectedImage(imageData);
     localStorage.setItem("uploadedImage", imageData);
-
     stopCamera();
-    
-    // Analyze the captured photo
     analyzeImage(imageData);
   };
 
-  const cancelCamera = () => {
-    stopCamera();
-  };
-  
+  const cancelCamera = () => stopCamera();
+
   useEffect(() => {
     const savedImage = localStorage.getItem("uploadedImage");
-    if (savedImage) {
-      setSelectedImage(savedImage);
-    }
-
+    if (savedImage) setSelectedImage(savedImage);
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
@@ -142,10 +111,7 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
       reader.onload = function (e) {
         const imageData = e.target.result;
         setSelectedImage(imageData);
-
         localStorage.setItem("uploadedImage", imageData);
-
-        // Analyze the uploaded image
         analyzeImage(imageData);
       };
       reader.readAsDataURL(file);
@@ -155,44 +121,55 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
   function handleUploadNew() {
     setSelectedImage(null);
     localStorage.removeItem("uploadedImage");
-    onIngredientsAnalyzed(null); // Clear ingredients
+    onIngredientsAnalyzed(null);
   }
 
   return (
     <div className="flex flex-col items-center">
       <h2 className="text-xl font-semibold mb-4">Upload Nutrition Label</h2>
 
-      {/* Box around file input */}
-      {!selectedImage && !cameraActive && (
-        <div className="flex flex-col space-y-4">
-          <label className="w-64 h-32 border-2 border-dashed border-gray-400 rounded flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all">
-            <span className="text-gray-500">📁 Click to choose file</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-          </label>
+  {/* ===============================
+      Reversed Button Order + Sizes
+  =============================== */}
+  {!selectedImage && !cameraActive && (
+    <div className="flex flex-col space-y-4">
+      {/* Large square "Take a Photo" */}
+      <button
+        onClick={startCamera}
+        className="w-64 h-32 border-2 border-dashed border-gray-400 rounded flex items-center justify-center
+                   text-gray-500 text-lg font-medium hover:border-indigo-400 hover:bg-indigo-50
+                   dark:hover:bg-indigo-950 transition-all"
+      >
+        📸 Take a Photo
+      </button>
 
-          {/* Take photo button */}
-          <button
-            onClick={startCamera}
-            className="w-64 h-12 border-2 border-dashed border-gray-400 rounded flex items-center justify-center hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all"
-          >
-            📸 Take a Photo
-          </button>
-        </div>
-      )}
+      {/* Smaller rectangle "Choose File" */}
+      <label
+        className="w-64 h-12 border-2 border-dashed border-gray-400 rounded flex items-center justify-center
+                   cursor-pointer text-gray-500 text-lg font-medium hover:border-indigo-400 hover:bg-indigo-50
+                   dark:hover:bg-indigo-950 transition-all"
+      >
+        📁 Choose File
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="hidden"
+        />
+      </label>
+    </div>
+  )}
 
-      {/* Camera preview */}
+      {/* ===============================
+          Camera preview
+      =============================== */}
       {cameraActive && (
         <div className="flex flex-col items-center space-y-4 w-full max-w-2xl">
           <div className="relative w-full">
-            <video 
-              ref={videoRef} 
-              className="w-full h-96 border-2 border-indigo-200 rounded-lg bg-black object-cover shadow-lg" 
-              autoPlay 
+            <video
+              ref={videoRef}
+              className="w-full h-96 border-2 border-indigo-200 rounded-lg bg-black object-cover shadow-lg"
+              autoPlay
               playsInline
               muted
             />
@@ -223,7 +200,9 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
         </div>
       )}
 
-      {/* Preview + new upload button */}
+      {/* ===============================
+          Preview + Re-upload
+      =============================== */}
       {selectedImage && (
         <div className="flex flex-col items-center">
           <img
@@ -231,23 +210,25 @@ export default function ImageUpload({ onIngredientsAnalyzed }) {
             alt="Selected nutrition label"
             className="max-w-md border-2 border-indigo-200 rounded-lg shadow-lg p-2 mt-2"
           />
-          
+
           {analyzing && (
             <div className="mt-6 flex flex-col items-center space-y-3">
               <div className="flex items-center space-x-3">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-                <span className="text-gray-700 dark:text-gray-300 font-medium">Analyzing ingredients...</span>
+                <span className="text-gray-700 dark:text-gray-300 font-medium">
+                  Analyzing ingredients...
+                </span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Using AI to extract and analyze nutrition data
               </p>
             </div>
           )}
-          
+
           {!analyzing && (
             <button
               onClick={handleUploadNew}
-              className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-500 to-green-400 text-white rounded-full hover:shadow-lg transition-all font-semibold"
+              className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-500 to-green-400 text-white rounded-full hover:shadow-md transition-all font-semibold"
             >
               Upload New Image
             </button>

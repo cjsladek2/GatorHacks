@@ -50,11 +50,6 @@ export default function RootLayout({ children }) {
         {/* Main content offset for fixed header */}
         <main className="flex-grow pt-24">{children}</main>
 
-        {/* Footer */}
-        <footer className="text-center py-10 text-gray-500 text-sm border-t border-gray-200 dark:border-gray-800">
-          Made with care by{" "}
-          <span className="text-indigo-500 font-semibold">Team Gatordillos</span>
-        </footer>
       </body>
     </html>
   );

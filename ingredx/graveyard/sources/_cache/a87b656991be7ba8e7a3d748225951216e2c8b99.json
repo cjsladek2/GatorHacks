@@ -1,9 +1,0 @@
-{
-  "source": "EPA SCIL",
-  "query": "sodium lauryl sulfate",
-  "facts": {},
-  "citations": [
-    "https://www.epa.gov/saferchoice/safer-ingredients"
-  ],
-  "error": "No CSV URL found on EPA SCIL page."
-}

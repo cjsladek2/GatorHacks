@@ -38,7 +38,7 @@ export default function Home() {
       {/* ================================
           Hero Section
       ================================ */}
-      <section className="relative text-center py-20 sm:py-28 overflow-visible">
+      <section className="relative text-center py-15 sm:py-15 overflow-visible">
         {/* White veil above gradient */}
         <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-0" />
 
@@ -51,28 +51,32 @@ export default function Home() {
         <div className="relative z-10">
           <h2 className="text-6xl sm:text-7xl font-extrabold leading-[1.15] text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-blue-500 to-green-500 animate-fade-in-up">
             Scan Ingredients.
-            <br />Discover Insights.
+            <br/>Discover Insights.
           </h2>
 
           <p className="mt-6 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto text-lg animate-fade-in-up">
-            Upload a label or photo and let DilloScan break down each ingredient into
-            health and environmental insights — fast, accurate, and beautifully explained.
+            Upload a label or photo and let Scanadillo break down each ingredient into health
+            and environmental insights — fast, accurate, and beautifully explained.
           </p>
 
           {/* Tabs */}
           <div className="mt-10 flex justify-center gap-4 flex-wrap animate-fade-in-up relative z-20">
             {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-7 py-3 rounded-full text-base font-semibold transition-all duration-300 transform ${
-                  activeTab === tab.id
-                    ? "bg-gradient-to-r from-indigo-500 to-green-400 text-white shadow-lg"
-                    : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
-                }`}
-              >
-                {tab.label}
-              </button>
+
+                <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-7 py-3 rounded-full text-base font-semibold transition-all duration-300 
+    ${
+                        activeTab === tab.id
+                            ? "bg-gradient-to-r from-indigo-500 to-green-400 text-white shadow-lg"
+                            : "bg-white text-gray-700 border border-gray-200 hover:shadow-md"
+                    }`}
+                >
+                  {tab.label}
+                </button>
+
+
             ))}
           </div>
         </div>
@@ -80,10 +84,10 @@ export default function Home() {
         {/* Armadillo mascot */}
         <div className="absolute bottom-[-20px] right-20 w-[180px] md:w-[220px] opacity-95 pointer-events-none">
           <Image
-            src="/armadillos/armadillo_laying.png"
-            alt="Resting armadillo mascot"
-            width={220}
-            height={120}
+              src="/armadillos/armadillo_laying.png"
+              alt="Resting armadillo mascot"
+              width={220}
+              height={120}
           />
         </div>
       </section>
@@ -95,38 +99,42 @@ export default function Home() {
         {activeTab !== "chat" ? (
           <div className="glass p-10 rounded-3xl shadow-xl animate-fade-in-up">
             {activeTab === "image" && (
-              <div id="scan-section">
-                <h3 className="text-2xl font-bold mb-6 text-indigo-600">Image Scanner</h3>
-                <ImageUpload onIngredientsAnalyzed={handleIngredientsAnalyzed} />
-              </div>
+                <div id="scan-section">
+                  <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-green-500">
+                    Image Scanner
+                  </h3>
+                  <ImageUpload onIngredientsAnalyzed={handleIngredientsAnalyzed}/>
+                </div>
             )}
 
             {activeTab === "ingredients" && (
-              <div id="ingredients-section">
-                <h3 className="text-2xl font-bold mb-6 text-indigo-600">Ingredients Overview</h3>
-                {analysisData && analysisData.success ? (
-                  <IngredientList analysisData={analysisData} />
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🔍</div>
-                    <p className="text-gray-600 dark:text-gray-400 text-lg">
-                      No ingredients detected yet. Upload an image to begin.
-                    </p>
-                    <button
-                      onClick={() => setActiveTab("image")}
-                      className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-full hover:shadow-lg transition-all font-semibold"
-                    >
-                      Go to Image Scanner
-                    </button>
-                  </div>
-                )}
-              </div>
+                <div id="ingredients-section">
+                  <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-green-500">
+                    Ingredients Overview
+                  </h3>
+                  {analysisData && analysisData.success ? (
+                      <IngredientList analysisData={analysisData}/>
+                  ) : (
+                      <div className="text-center py-12">
+                        <div className="text-6xl mb-4">🔍</div>
+                        <p className="text-gray-600 dark:text-gray-400 text-lg">
+                          No ingredients detected yet. Upload an image to begin.
+                        </p>
+                        <button
+                            onClick={() => setActiveTab("image")}
+                            className="mt-6 px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-full hover:shadow-lg transition-all font-semibold"
+                        >
+                          Go to Image Scanner
+                        </button>
+                      </div>
+                  )}
+                </div>
             )}
           </div>
         ) : (
-          <div id="chat-section" className="animate-fade-in-up mt-4">
-            <Chatbot
-              ingredients={analysisData?.ingredients || []}
+            <div id="chat-section" className="animate-fade-in-up mt-4">
+              <Chatbot
+                  ingredients={analysisData?.ingredients || []}
               analysisData={analysisData}
             />
           </div>
@@ -139,7 +147,7 @@ export default function Home() {
       <footer className="relative w-full border-t border-gray-200 bg-white/60 backdrop-blur-md py-6 mt-20">
         <div className="max-w-5xl mx-auto flex justify-center items-center">
           <p className="text-sm text-gray-600">
-            Made with care by{" "}
+            Made with love by{" "}
             <span className="font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-green-500">
               Team Gatordillos
             </span>
